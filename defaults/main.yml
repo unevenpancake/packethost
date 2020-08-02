@@ -1,0 +1,10 @@
+---
+packet_tag: VSPHERE
+packet_facility: iad2
+packet_hostname: esxi.example.com
+packet_operating_system: vmware_esxi_6_7
+packet_api_token: "{{ lookup('env', 'PACKET_API_TOKEN') }}"
+packet_project: "{{ packet_projects.json.projects[0].id }}"
+network_tag_query: "ip_addresses[?contains(tags,'{{ packet_tag }}')].id"
+device_query: "devices[?contains(tags, '{{ packet_tag }}')].id"
+server_body: "{ \"facility\": \"iad2\", \"plan\": \"c3.medium.x86\", \"hostname\": \"{{ packet_hostname }}\", \"operating_system\": \"{{ packet_operating_system }}\", \"tags\": [ \"{{ packet_tag }}\" ],  \"ip_addresses\": [ { \"address_family\": 4, \"public\": false }, { \"address_family\": 4, \"public\": true, \"cidr\": 29, \"ip_reservations\": [\"{{ tagged_network_id }}\"] } ] }"

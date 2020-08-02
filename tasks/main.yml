@@ -1,0 +1,86 @@
+---
+- name: Find a project ID
+  uri: 
+    url: https://api.packet.net/projects
+    method: get
+    headers:
+      X-Auth-Token: "{{ packet_api_token }}"
+    return_content: yes
+    body_format: json
+  register: packet_projects
+
+- set_fact:
+    packet_project_id: "{{ packet_project }}"
+
+- name: Check for existence of a network with specified tag
+  uri: 
+    url: https://api.packet.net/projects/{{ packet_project_id }}/ips
+    method: get
+    headers:
+      X-Auth-Token: "{{ packet_api_token }}"
+    return_content: yes
+    body_format: json
+  register: test_for_network_existence
+
+- set_fact:
+    tagged_network_exists: "{{ test_for_network_existence.json | json_query(network_tag_query) }}"
+
+- name: Create a Packet network with /29
+  uri: 
+    url: https://api.packet.net/projects/{{ packet_project_id }}/ips
+    method: post
+    headers:
+      X-Auth-Token: "{{ packet_api_token }}"
+    return_content: yes
+    body: '{ "type": "public_ipv4", "quantity": 8, "facility": "iad2", "tags": [ "VSPHERE" ] }'
+    body_format: json
+    status_code: [200,201]
+  register: network_created
+  when: not tagged_network_exists
+
+- set_fact:
+    tagged_network_id: "{{ network_created.json.id }}"
+  when: not tagged_network_exists
+
+- set_fact:
+    tagged_network_id: "{{ tagged_network_exists[0] }}"
+  when: tagged_network_exists
+
+- name: Get packet server system
+  uri: 
+    url: https://api.packet.net/projects/{{ packet_project_id }}/devices
+    method: get
+    headers:
+      X-Auth-Token: "{{ packet_api_token }}"
+    return_content: yes
+    body_format: json
+  register: server_exists
+
+- set_fact:
+    server_info: "{{ server_exists.json | json_query(device_query) }}"
+
+- name: Create a Packet server
+  uri: 
+    url: https://api.packet.net/projects/{{ packet_project_id }}/devices
+    method: post
+    headers:
+      X-Auth-Token: "{{ packet_api_token }}"
+    return_content: yes
+    body: "{{ server_body }}"
+    body_format: json
+    status_code: [200,201]
+  register: server_info
+  when: not server_info
+
+- name: Get packet server system
+  uri: 
+    url: https://api.packet.net/projects/{{ packet_project_id }}/devices
+    method: get
+    headers:
+      X-Auth-Token: "{{ packet_api_token }}"
+    return_content: yes
+    body_format: json
+  register: packet_device
+  until: packet_devices.json.devices[0].state == "active"
+  retries: 720
+  delay: 5
